@@ -12,8 +12,7 @@ from html.parser import HTMLParser
 from functools import partial
 from xml.etree import ElementTree as ET
 
-from db import StockDB
-
+from db import InsiderDB
 
 class EDGARInsiderTrading():
     def __init__(self):
@@ -42,8 +41,7 @@ class EDGARInsiderTrading():
         # symbol MM/DD/YYYY MM/DD/YYYY
         self.mktwatchurl = 'https://www.marketwatch.com/investing/stock/{tckr}/downloaddatapartial?startdate={fdate}%2000:00:00&enddate={tdate}%2000:00:00&daterange=d30&frequency=p1d&csvdownload=true&downloadpartial=false&newdates=false'
 
-        self.iturl = 'https://www.sec.gov/files/structureddata/data/'
-        'insider-transactions-data-sets'
+        self.iturl = 'https://www.sec.gov/files/structureddata/data/insider-transactions-data-sets'
         self.topsubmissions={}
         self.transtop=[]
         self.bigtransdict={}
@@ -227,9 +225,10 @@ class EDGARInsiderTrading():
                      th[hdr[i]] = '%s-%s-%s' % (da[2],mton[da[1]], da[0])
             if not re.match('(Common|Shares|Stock*)*', th['SECURITY_TITLE']):
                 continue
+            th['TRANSDOLLARS'] = transdollars
             prtransdict[transdollars].append(th)
         skl = sorted(prtransdict.keys(), reverse=True )
-        for i in range(100):
+        for i in range(128):
             self.transtop.append(prtransdict[skl[i] ] )
         # get accession numbers for submissions
         for amta in self.transtop:
@@ -255,6 +254,8 @@ class EDGARInsiderTrading():
                 hdr = la
                 continue
             an = la[0]
+            if len(la[11]) == 0:
+                continue
             if an in self.bigtransdict.keys():
                 self.bigtransdict[an]['ISSUERTRADINGSYMBOL'] = la[11]
 
@@ -274,13 +275,8 @@ class EDGARInsiderTrading():
                 continue
             an = la[0]
             if an in self.bigtransdict.keys():
-                self.bigtransdict['RPTOWNERCIK'] = la[1]
-                self.bigtransdict['RPTOWNERNAME'] = la[2]
-
-    def processform345(self, fzpath):
-        self.form345largesttrades(fzpath, 'NONDERIV_TRANS.tsv')
-        self.form345submissions(fzpath, 'SUBMISSION.tsv')
-        self.form345names(fzpath, 'REPORTINGOWNER.tsv')
+                self.bigtransdict[an]['RPTOWNERCIK'] = la[1]
+                self.bigtransdict[an]['RPTOWNERNAME'] = la[2]
 
     def genform345name(self):
         """ genform345name()
@@ -347,6 +343,63 @@ class EDGARInsiderTrading():
             for k in adict.keys():
                 print('%s: %s' % (k, adict[k]) )
 
+    def processform345(self, fzpath):
+        self.form345largesttrades(fzpath, 'NONDERIV_TRANS.tsv')
+        self.form345submissions(fzpath, 'SUBMISSION.tsv')
+        self.form345names(fzpath, 'REPORTINGOWNER.tsv')
+
+    def processtickers(self, insiderdb):
+        up = 1.04
+        dwn = 1/up
+        sdb = InsiderDB()
+        sdb.insiderdbconnect(insiderdb)
+        tset = set()
+        for ak in self.bigtransdict.keys():
+            ticker = self.bigtransdict[ak]['ISSUERTRADINGSYMBOL'].lower()
+            if not ticker:
+                continue
+            action = self.bigtransdict[ak]['TRANS_ACQUIRED_DISP_CD']
+            if ticker not in tset:
+                sdb.newtickertable(ticker)
+                sdb.newinsidertable()
+                rstr = sdb.gettickerts(ticker)
+                if rstr == 'No data':
+                    continue
+                sdb.tickerinsertblob(ticker, rstr)
+                tset.add(ticker)
+            trdate = self.bigtransdict[ak]['TRANS_DATE']
+            tres = sdb.selectndays(insiderdb, ticker, trdate, 7)
+            day0 = None
+            for trd in tres:
+                if not day0:
+                    day0 = trd
+                    continue
+                if action == 'A':
+                    if float(trd[2]) >= float(day0[2])*up or \
+                       float(trd[4]) >= float(day0[4])*up:
+                        cik = self.bigtransdict[ak]['RPTOWNERCIK']
+                        owner = self.bigtransdict[ak]['RPTOWNERNAME']
+                        dollars = self.bigtransdict[ak]['TRANSDOLLARS']
+                        trds = "'%s','%s','%s','%s','%s','%s'" % (trd[0],
+                             trd[1], trd[2], trd[3], trd[4], trd[5])
+                        rec = "'%s','%s','%s','%s','%s',%s" % (ak, cik,
+                              owner, ticker, dollars, trds)
+                        sdb.insiderinsert(rec)
+                        print(rec)
+                elif action =='D':
+                    if float(trd[3]) <= float(day0[3])*dwn or \
+                       float(trd[4]) <= float(day0[4])*dwn:
+                        cik = self.bigtransdict[ak]['RPTOWNERCIK']
+                        owner = self.bigtransdict[ak]['RPTOWNERNAME']
+                        dollars = self.bigtransdict[ak]['TRANSDOLLARS']
+                        trds = "'%s','%s','%s','%s','%s','%s'" % (trd[0],
+                            trd[1], trd[2], trd[3], trd[4], trd[5])
+                        rec = "'%s','%s','%s','%s','%s',%s" % (ak, cik,
+                              owner, ticker, dollars, trds)
+                        sdb.insiderinsert(rec)
+                        print(rec)
+
+
 def main():
     EIT = EDGARInsiderTrading()
     argp = argparse.ArgumentParser(prog='edgarinsidertrading',
@@ -354,13 +407,17 @@ def main():
 
     argp.add_argument("--directory", default='/tmp',
         help="directory to store the output")
+    argp.add_argument("--insiderdb", required=True,
+        help="ticker time series database")
 
     args = argp.parse_args()
 
     fznm = EIT.genform345name()
     fzpath = os.path.join(args.directory, fznm)
+    EIT.getform345(fznm, args.directory)
 
     EIT.processform345(fzpath)
+    EIT.processtickers(args.insiderdb)
 
     #xml = EIT.getgnewsatom()
     #res = EIT.searchgnewsatom(xml, 'Nvidia')

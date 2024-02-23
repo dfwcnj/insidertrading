@@ -1,0 +1,60 @@
+
+o  # insider trading
+  https://www.sec.gov/dera/data/form-345
+  ACCESSION_NUMBER identifies submissions field 1 array[0]
+  get biggest 100 trades in a quarter
+  determine if a purchase or a sale
+  NONDERIV_TRANS.tsv
+      date TRANS_DATE field 5
+      shareѕ TRANS_SHARES field 15
+      price per share TRANS_PRICEPERSHARE field 17
+      disposition TRANS_ACQUIRED_DISP_CD field 19 'A'cquire 'D'ispose
+  find the ticker
+  SUBMISSIONS.tsv
+      ticker ISSUERTRADINGSYMBOL field 12
+  find the owner
+  REPORTINGOWNER.tsv
+      CIK  RPTOWNERCIK field 2
+      name RPTOWNERNAME field 3
+  search historical prices for the ticker for big movement
+  if a purchase look for big movements upward the following n days
+  if a sale look for big movements downward the following n days
+  
+  ## google atom feed
+  https://news.google.com/atom?hl=en-US&gl=US&ceid=US:en
+  ## stock price history data
+  https://www.marketwatch.com/investing/stock/%s/downloaddatapartial
+  https://stooq.com/q/d/l/?s=%s.us&i=d
+  ## other stock news
+  https://www.moneyworks4me.com/company/news/stock-news-rss-feeds
+  
+  https://www.marketwatch.com/site/rss
+  https://feeds.content.dowjones.io/public/rss/mw_topstories
+  https://feeds.content.dowjones.io/public/rss/mw_bulletins
+  https://feeds.content.dowjones.io/public/rss/mw_marketpulse
+  
+  https://www.nasdaq.com/nasdaq-RSS-Feeds
+  https://www.nasdaqtrader.com/trader.aspx?id=newsrss
+  https://www.nasdaq.com/feed/rssoutbound?category=Stocks
+  https://www.nasdaq.com/feed/rssoutbound?symbol=NVDA
+  https://www.nasdaqtrader.com/rss.aspx?feed=currentheadlines&categorylist=2,6,7
+  https://www.nasdaqtrader.com/rss.aspx?feed=currentheadlines&categorylist=2
+
+  https://feeds.a.dj.com/rss/RSSMarketsMain.xml
+  https://developer.dowjones.com/site/docs/newswires_apis/dow_jones_investor_select_rss_api/index.gsp
+
+  https://www.spglobal.com/spdji/en/rss/
+  https://www.spglobal.com/spdji/en/rss/rss-details/?rssFeedName=market-commentary
+
+  https://www.investing.com/webmaster-tools/rss
+  https://www.morningstar.co.uk/uk/news/rss.aspx?lang=en-GB
+  https://www.wsj.com/news/rss-news-and-feeds
+  https://feeds.a.dj.com/rss/RSSMarketsMain.xml
+  https://www.barchart.com/news/feeds
+  https://www.barchart.com/news/rss/financials/stock-market
+
+  https://www.federalreserve.gov/feeds/feeds.htm
+  https://www.sec.gov/about/sec-rss
+  https://www.stlouisfed.org/rss
+  https://fred.stlouisfed.org/series/SP500
+
