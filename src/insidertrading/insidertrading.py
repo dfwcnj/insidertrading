@@ -380,24 +380,28 @@ class EDGARInsiderTrading():
                         cik = self.bigtransdict[ak]['RPTOWNERCIK']
                         owner = self.bigtransdict[ak]['RPTOWNERNAME']
                         dollars = self.bigtransdict[ak]['TRANSDOLLARS']
+                        brds = "'%s','%s','%s','%s','%s','%s'" % (day0[0],
+                             day0[1], day0[2], day0[3], day0[4], day0[5])
                         trds = "'%s','%s','%s','%s','%s','%s'" % (trd[0],
                              trd[1], trd[2], trd[3], trd[4], trd[5])
-                        rec = "'%s','%s','%s','%s','%s',%s" % (ak, cik,
-                              owner, ticker, dollars, trds)
+                        rec = "'%s','%s','%s','%s','%s',%s,%s" % (ak, cik,
+                              owner, ticker, dollars, brds, trds)
                         sdb.insiderinsert(rec)
-                        print(rec)
+                        #print(rec)
                 elif action =='D':
                     if float(trd[3]) <= float(day0[3])*dwn or \
                        float(trd[4]) <= float(day0[4])*dwn:
                         cik = self.bigtransdict[ak]['RPTOWNERCIK']
                         owner = self.bigtransdict[ak]['RPTOWNERNAME']
                         dollars = self.bigtransdict[ak]['TRANSDOLLARS']
+                        brds = "'%s','%s','%s','%s','%s','%s'" % (day0[0],
+                             day0[1], day0[2], day0[3], day0[4], day0[5])
                         trds = "'%s','%s','%s','%s','%s','%s'" % (trd[0],
                             trd[1], trd[2], trd[3], trd[4], trd[5])
-                        rec = "'%s','%s','%s','%s','%s',%s" % (ak, cik,
-                              owner, ticker, dollars, trds)
+                        rec = "'%s','%s','%s','%s','%s',%s,%s" % (ak, cik,
+                              owner, ticker, dollars, brds, trds)
                         sdb.insiderinsert(rec)
-                        print(rec)
+                        #print(rec)
 
 
 def main():

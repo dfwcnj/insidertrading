@@ -27,12 +27,15 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Documentation = "https://github.com/unknown/insidertrading#readme"
-Issues = "https://github.com/unknown/insidertrading/issues"
-Source = "https://github.com/unknown/insidertrading"
+Documentation = "https://github.com/dfwcnj/insidertrading#readme"
+Issues = "https://github.com/dfwcnj/insidertrading/issues"
+Source = "https://github.com/dfwcnj/insidertrading"
 
 [tool.hatch.version]
 path = "src/insidertrading/__about__.py"
+
+[project.scripts]
+insidertrading = "insidertrading.insidertrading:main"
 
 [tool.hatch.envs.default]
 dependencies = [

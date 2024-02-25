@@ -15,7 +15,7 @@ class InsiderDB():
         self.tidx = "CREATE UNIQUE INDEX IF NOT EXISTS dtidx ON %s ('Date')"
         self.tins = 'INSERT OR IGNORE INTO %s VALUES (%s)'
         self.tsel = "SELECT * FROM %s WHERE Date BETWEEN date('%s') AND date('%s')"
-        self.itbl = "CREATE TABLE IF NOT EXISTS insiders ('Accession_Number','CIK','Name','Dollars','Ticker','Date','Open','Hick','Low','Close','Volume')"
+        self.itbl = "CREATE TABLE IF NOT EXISTS insiders ('Accession_Number','CIK','Name','Dollars','Ticker','BDate','BOpen','BHigh','BLow','BClose','BVolume','Date','Open','High','Low','Close','Volume')"
         self.iidx = "CREATE UNIQUE INDEX IF NOT EXISTS insidx ON insiders ('Accession_Number')"
         self.ins = 'INSERT OR IGNORE INTO insiders VALUES (%s)'
         self.stooq = 'https://stooq.com/q/d/l/?s=%s.us&i=d'
@@ -66,14 +66,16 @@ class InsiderDB():
                 continue
             lna = line.split(',')
             if len(lna) != 6:
-                print('%s %s' % (len(lna), line) )
-                continue
+                print('%s %s %s' % (tblname, len(lna), line) )
+                lna.append('-1')
             for i in range(len(lna) ):
                 lna[i] = "'%s'" % (lna[i])
             self.tickerinsert(tblname, ','.join(lna))
         self.dbcon.commit()
 
     def newtickertable(self, tblname):
+        dsql = 'DROP TABLE %s' % (tblname)
+        self.dbcur.execute(dsql)
         nsql = self.ttbl % (tblname)
         self.dbcur.execute(nsql)
         isql = self.tidx % (tblname)
