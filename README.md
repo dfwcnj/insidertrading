@@ -30,9 +30,16 @@ It merely reports that the stock moved by some threshold after the
 transaction. It could be because of coincidence, because the stock is
 unusually volatile, or some other innocuous reason.
 
+If you do not provide a --yq argument, the command determins the last
+quarter from the current date and uses that
+
+if you do not provide an --insiderdb argument, the sqlite3 database is
+created in the current directory
+
 ## Usage
 
-usage: edgarinsidertrading [-h] [--directory DIRECTORY] --insiderdb INSIDERDB
+usage: edgarinsidertrading [-h] [--directory DIRECTORY]
+                           [--insiderdb INSIDERDB] [--yq YQ]
 
 report possibly illegal insider trading
 
@@ -41,4 +48,5 @@ options:
   --directory DIRECTORY
                         directory to store the output
   --insiderdb INSIDERDB
-                        ticker time series database
+                        full path to the sqlite3 database
+  --yq YQ               year quarter in form YYYYQ[1-4]

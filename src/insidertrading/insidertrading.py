@@ -419,8 +419,8 @@ def main():
 
     argp.add_argument("--directory", default='/tmp',
         help="directory to store the output")
-    argp.add_argument("--insiderdb", required=True,
-        help="ticker time series database")
+    argp.add_argument("--insiderdb", default='insiders.db',
+        help="full path to the sqlite3  database")
     argp.add_argument("--yq",
         help="year quarter in form YYYYQ[1-4]")
 
