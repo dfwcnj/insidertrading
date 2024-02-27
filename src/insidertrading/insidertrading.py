@@ -259,8 +259,8 @@ class EDGARInsiderTrading():
             if an in self.bigtransdict.keys():
                 self.bigtransdict[an]['ISSUERTRADINGSYMBOL'] = la[11]
 
-    def form345names(self, fzpath, file):
-        """ form345names(fzpath, file)
+    def form345owners(self, fzpath, file):
+        """ form345owners(fzpath, file)
 
         match owner name and cik to a transaction
         fzpath - full path name to the form345.zip file
@@ -278,21 +278,29 @@ class EDGARInsiderTrading():
                 self.bigtransdict[an]['RPTOWNERCIK'] = la[1]
                 self.bigtransdict[an]['RPTOWNERNAME'] = la[2]
 
-    def genform345name(self):
-        """ genform345name()
+    def form345name(self, yq):
+        """ form345name()
 
         construct the name of the most recent SEC EDGAR insider trading
         data. It consists of data from forms 2-5, hence the name
         """
-        now = datetime.datetime.now()
-        year = now.year
-        qtr = None
-        if now.month < 3:
-            qtr  = 4
-            year = year -1
-        elif now.month < 6: qtr = 2
-        elif now.month < 9: qtr = 3
-        else:               qtr = 4
+        if yq:
+            try:
+                ys, qs = yq.split('Q')
+                year = int(ys)
+                qtr = int(qs)
+            except Exception as e:
+                print('yq %s: %s' % (yq, e) )
+        else:
+            now = datetime.datetime.now()
+            year = now.year
+            qtr = None
+            if now.month < 3:
+                qtr  = 4
+                year = year -1
+            elif now.month < 6: qtr = 2
+            elif now.month < 9: qtr = 3
+            else:               qtr = 4
 
         fznm = '%dq%d_form345.zip' % (year, qtr)
         return fznm
@@ -346,7 +354,7 @@ class EDGARInsiderTrading():
     def processform345(self, fzpath):
         self.form345largesttrades(fzpath, 'NONDERIV_TRANS.tsv')
         self.form345submissions(fzpath, 'SUBMISSION.tsv')
-        self.form345names(fzpath, 'REPORTINGOWNER.tsv')
+        self.form345owners(fzpath, 'REPORTINGOWNER.tsv')
 
     def processtickers(self, insiderdb):
         up = 1.04
@@ -413,10 +421,12 @@ def main():
         help="directory to store the output")
     argp.add_argument("--insiderdb", required=True,
         help="ticker time series database")
+    argp.add_argument("--yq",
+        help="year quarter in form YYYYQ[1-4]")
 
     args = argp.parse_args()
 
-    fznm = EIT.genform345name()
+    fznm = EIT.form345name(args.yq)
     fzpath = os.path.join(args.directory, fznm)
     EIT.getform345(fznm, args.directory)
 

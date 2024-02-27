@@ -74,7 +74,7 @@ class InsiderDB():
         self.dbcon.commit()
 
     def newtickertable(self, tblname):
-        dsql = 'DROP TABLE %s' % (tblname)
+        dsql = 'DROP TABLE IF EXISTS %s' % (tblname)
         self.dbcur.execute(dsql)
         nsql = self.ttbl % (tblname)
         self.dbcur.execute(nsql)
