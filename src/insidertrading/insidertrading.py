@@ -12,7 +12,10 @@ from html.parser import HTMLParser
 from functools import partial
 from xml.etree import ElementTree as ET
 
-from db import InsiderDB
+try:
+    from insidertrading import db
+except ImportError as e:
+    import db
 
 class EDGARInsiderTrading():
     def __init__(self):
@@ -48,7 +51,7 @@ class EDGARInsiderTrading():
         self.bigtransdict={}
         self.threshold = 1.05
         self.interval = 7
-        self.sdb = InsiderDB()
+        self.sdb = db.InsiderDB()
 
         self.chunksize =4294967296 # 4M
 
@@ -145,40 +148,6 @@ class EDGARInsiderTrading():
 
         parser = MyHTMLParser()
         parser.feed(html)
-
-    def getmarketwatchtickerhistory(self, ticker, directory):
-        """ marketwatchtickerhistory(ticker, directory)
-
-        get stock price history for ticker
-        ticker - ticker symbol for stock
-        directory - where to store the output
-        """
-        now = datetime.datetime.now()
-        day = ('%d' % (now.day) ).zfill(2)
-        mon = ('%d' % (now.month) ).zfill(2)
-        yr  = now.year
-        odt = '%s/%s/%d' % (mon, day, yr-1)
-        ndt = '%s/%s/%d' % (mon, day, yr)
-        url = self.mktwatchurl.format( tckr=ticker, fdate=odt, tdate=ndt)
-        print(url)
-        resp = self.query(url)
-        ofn = os.path.join(directory, '%s-mw.csv' % (s) )
-        self.storequery(resp, ofn)
-
-
-    def getstooqtickerhistory(self, ticker, directory):
-        """ getstooqtickerhistory(ticker, directory)
-
-        get stock price history for ticker
-        ticker - ticker symbol for stock
-        directory - where to store the output
-        """
-        url = self.stooqurl % (ticker)
-        print(url)
-        resp = self.query(url)
-        ofn = os.path.join(directory, '%s-us.csv' % (s) )
-        self.storequery(resp, ofn)
-
 
     def form345zipfileiter(self, fzpath, file):
         """ form345zipfileiter(fzpath, iter)
@@ -390,9 +359,14 @@ class EDGARInsiderTrading():
             if ticker not in tset:
                 self.sdb.newtickertable(ticker)
                 self.sdb.newinsidertable()
-                rstr = self.sdb.gettickerts(ticker)
-                if rstr == 'No data':
-                    continue
+                rstr = self.sdb.getstooqtickerhistory(ticker)
+                if len(rstr.split('\n') ) ==1:
+                    print('stooq %s %s' % (ticker, rstr), file=sys.stderr)
+                    rstr = self.sdb.getmarketwatchtickerhistory(ticker)
+                    if len(rstr.split('\n') ) ==1:
+                        print('marketwatch %s %s' % (ticker, rstr),
+                              file=sys.stderr)
+                        continue
                 self.sdb.tickerinsertblob(ticker, rstr)
                 tset.add(ticker)
             trdate = self.bigtransdict[ak]['TRANS_DATE']
