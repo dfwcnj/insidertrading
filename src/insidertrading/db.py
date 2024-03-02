@@ -55,7 +55,7 @@ class InsiderDB():
         odt = '%s/%s/%d' % (mon, day, yr-1)
         ndt = '%s/%s/%d' % (mon, day, yr)
         url = self.mktwatchurl.format( tckr=ticker, fdate=odt, tdate=ndt)
-        print(url)
+        # print(url, file=sys.stderr)
         resp = self.query(url)
         rstr = resp.read().decode('utf-8')
         return rstr
@@ -68,6 +68,7 @@ class InsiderDB():
         ticker - ticker symbol for stock
         """
         url = self.stooqurl % (ticker)
+        # print(url, file=sys.stderr)
         resp = self.query(url)
         rstr = resp.read().decode('utf-8')
         return rstr

@@ -374,6 +374,10 @@ class EDGARInsiderTrading():
                     self.interval)
             day0 = None
             for trd in tres:
+                tlst = list(trd)
+                for i in range(len(tlst) ):
+                    tlst[i] = re.sub('[",]', '', tlst[i])
+                trd = tuple(tlst)
                 if not day0:
                     day0 = trd
                     continue
