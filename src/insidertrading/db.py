@@ -92,6 +92,17 @@ class InsiderDB():
         self.dbcur.execute(self.iidx)
         self.dbcon.commit()
 
+    def reporttable(self, table, fp):
+        rsql = 'SELECT * FROM %s' % (table)
+        self.dbcur.execute(rsql)
+        hdr = [column[0] for column in self.dbcur.description]
+        print('"%s"' % ('","'.join(hdr) ), file=fp )
+        rows = self.dbcur.fetchall()
+        for row in rows:
+            print('"%s"' % ('","'.join(row) ), file=fp )
+
+
+
 
 
 def main():

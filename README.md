@@ -38,15 +38,20 @@ created in the current directory
 
 ## Usage
 
-usage: edgarinsidertrading [-h] [--directory DIRECTORY]
-                           [--insiderdb INSIDERDB] [--yq YQ]
+usage: edgarinsidertrading [-h] [--yq YQ] [--threshold THRESHOLD]
+                           [--interval INTERVAL] [--insiderdb INSIDERDB]
+                           [--directory DIRECTORY] [--file FILE]
 
 report possibly illegal insider trading
 
 options:
   -h, --help            show this help message and exit
+  --yq YQ               year quarter in form YYYYQ[1-4]
+  --threshold THRESHOLD
+                        stock price change threshold - 0-50
+  --interval INTERVAL   number of days to consider for price movements 1-14
+  --insiderdb INSIDERDB
+                        full path to the sqlite3 database - default in memory
   --directory DIRECTORY
                         directory to store the output
-  --insiderdb INSIDERDB
-                        full path to the sqlite3 database
-  --yq YQ               year quarter in form YYYYQ[1-4]
+  --file FILE           csv file to store the output - default stdout

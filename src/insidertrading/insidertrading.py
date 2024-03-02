@@ -41,12 +41,30 @@ class EDGARInsiderTrading():
         # symbol MM/DD/YYYY MM/DD/YYYY
         self.mktwatchurl = 'https://www.marketwatch.com/investing/stock/{tckr}/downloaddatapartial?startdate={fdate}%2000:00:00&enddate={tdate}%2000:00:00&daterange=d30&frequency=p1d&csvdownload=true&downloadpartial=false&newdates=false'
 
+        # from https://www.sec.gov/dera/data/form-345
         self.iturl = 'https://www.sec.gov/files/structureddata/data/insider-transactions-data-sets'
         self.topsubmissions={}
         self.transtop=[]
         self.bigtransdict={}
+        self.threshold = 1.05
+        self.interval = 7
+        self.sdb = InsiderDB()
 
         self.chunksize =4294967296 # 4M
+
+    def setthreshold(self, thresh):
+        ti = int(thresh)
+        if ti < 0 or ti > 50:
+            print('setthreshold: range 0-50', file=sys.stderr)
+            sys.exit(1)
+        self.threshold = 1 + ti/100
+
+    def setinterval(self, intvl):
+        ti = int(intvl)
+        if ti < 1 or ti > 14:
+            print('setinterval: range 1-14', file=sys.stderr)
+            sys.exit(1)
+        self.interval = intvl
 
     def query(self, url=None):
         """query(url) - query a url
@@ -62,6 +80,9 @@ class EDGARInsiderTrading():
                 resp = urllib.request.urlopen(req)
                 return resp
             except urllib.error.URLError as e:
+                if e.reason == 'Not Found':
+                    print('%s: %s' % (url, e.reason), file=sys.stderr)
+                    sys.exit(1)
                 print("Error %s(%s): %s" % ('query', url, e.reason),
                      file=sys.stderr )
                 count = count + 1
@@ -295,12 +316,12 @@ class EDGARInsiderTrading():
             now = datetime.datetime.now()
             year = now.year
             qtr = None
-            if now.month < 3:
+            # assuming a quarter delay
+            if now.month < 6:
                 qtr  = 4
                 year = year -1
-            elif now.month < 6: qtr = 2
-            elif now.month < 9: qtr = 3
-            else:               qtr = 4
+            elif now.month < 9: qtr = 1
+            else:               qtr = 2
 
         fznm = '%dq%d_form345.zip' % (year, qtr)
         return fznm
@@ -357,10 +378,9 @@ class EDGARInsiderTrading():
         self.form345owners(fzpath, 'REPORTINGOWNER.tsv')
 
     def processtickers(self, insiderdb):
-        up = 1.04
+        up = self.threshold
         dwn = 1/up
-        sdb = InsiderDB()
-        sdb.insiderdbconnect(insiderdb)
+        self.sdb.insiderdbconnect(insiderdb)
         tset = set()
         for ak in self.bigtransdict.keys():
             ticker = self.bigtransdict[ak]['ISSUERTRADINGSYMBOL'].lower()
@@ -368,15 +388,16 @@ class EDGARInsiderTrading():
                 continue
             action = self.bigtransdict[ak]['TRANS_ACQUIRED_DISP_CD']
             if ticker not in tset:
-                sdb.newtickertable(ticker)
-                sdb.newinsidertable()
-                rstr = sdb.gettickerts(ticker)
+                self.sdb.newtickertable(ticker)
+                self.sdb.newinsidertable()
+                rstr = self.sdb.gettickerts(ticker)
                 if rstr == 'No data':
                     continue
-                sdb.tickerinsertblob(ticker, rstr)
+                self.sdb.tickerinsertblob(ticker, rstr)
                 tset.add(ticker)
             trdate = self.bigtransdict[ak]['TRANS_DATE']
-            tres = sdb.selectndays(insiderdb, ticker, trdate, 7)
+            tres = self.sdb.selectndays(insiderdb, ticker, trdate,
+                    self.interval)
             day0 = None
             for trd in tres:
                 if not day0:
@@ -394,7 +415,7 @@ class EDGARInsiderTrading():
                              trd[1], trd[2], trd[3], trd[4], trd[5])
                         rec = "'%s','%s','%s','%s','%s',%s,%s" % (ak, cik,
                               owner, ticker, dollars, brds, trds)
-                        sdb.insiderinsert(rec)
+                        self.sdb.insiderinsert(rec)
                         #print(rec)
                 elif action =='D':
                     if float(trd[3]) <= float(day0[3])*dwn or \
@@ -408,8 +429,11 @@ class EDGARInsiderTrading():
                             trd[1], trd[2], trd[3], trd[4], trd[5])
                         rec = "'%s','%s','%s','%s','%s',%s,%s" % (ak, cik,
                               owner, ticker, dollars, brds, trds)
-                        sdb.insiderinsert(rec)
+                        self.sdb.insiderinsert(rec)
                         #print(rec)
+
+    def reportinsiders(self, fp):
+        self.sdb.reporttable('insiders', fp)
 
 
 def main():
@@ -417,14 +441,26 @@ def main():
     argp = argparse.ArgumentParser(prog='edgarinsidertrading',
               description='report possibly illegal insider trading')
 
-    argp.add_argument("--directory", default='/tmp',
-        help="directory to store the output")
-    argp.add_argument("--insiderdb", default='insiders.db',
-        help="full path to the sqlite3  database")
     argp.add_argument("--yq",
         help="year quarter in form YYYYQ[1-4]")
+    argp.add_argument("--threshold", type=int,
+        help="stock price change threshold - 0-50")
+    argp.add_argument("--interval", type=int,
+        help="number of days to consider for price movements 1-14")
+
+    argp.add_argument("--insiderdb", default=':memory:',
+        help="full path to the sqlite3  database - default in memory")
+    argp.add_argument("--directory", default='/tmp',
+        help="directory to store the output")
+    argp.add_argument("--file",
+        help="csv file to store the output - default stdout")
 
     args = argp.parse_args()
+
+    if args.threshold:
+        EIT.setthreshold(args.threshold)
+    if args.interval:
+        EIT.setinterval(args.threshold)
 
     fznm = EIT.form345name(args.yq)
     fzpath = os.path.join(args.directory, fznm)
@@ -432,6 +468,15 @@ def main():
 
     EIT.processform345(fzpath)
     EIT.processtickers(args.insiderdb)
+
+    fp = sys.stdout
+    if args.file:
+        try:
+            fp = open(args.file, 'w')
+        except Exception as e:
+            print('' % (), file=sys.stderr)
+            sys.exit(1)
+    EIT.reportinsiders(fp)
 
     #xml = EIT.getgnewsatom()
     #res = EIT.searchgnewsatom(xml, 'Nvidia')
