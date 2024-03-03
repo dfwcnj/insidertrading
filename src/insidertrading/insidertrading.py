@@ -32,6 +32,7 @@ class EDGARInsiderTrading():
 
 
         self.pause = 2
+        self.verbose = False
 
         self.cpat = 'AAPL|AMZN|BRK-B|GOOG|LLY|META|NVDA|JPM|TSLA'
         self.siturl = ''
@@ -55,6 +56,11 @@ class EDGARInsiderTrading():
 
         self.chunksize =4294967296 # 4M
 
+    def setverbose(self):
+        if self.verbose == False:
+            self.verbose = True
+        else: self.verbose = False
+
     def setthreshold(self, thresh):
         ti = int(thresh)
         if ti < 0 or ti > 50:
@@ -74,6 +80,8 @@ class EDGARInsiderTrading():
 
          url - url of file to retrieve
         """
+        if self.verbose:
+            print('query: %s' % (url), file=sys.stderr)
         count = 0
         max   = 5
         paws = self.pause
@@ -103,6 +111,8 @@ class EDGARInsiderTrading():
         resp - response object of the url retrieved
         file   - filename that will hold the query response
         """
+        if self.verbose:
+            print('storequery: %s' % (file), file=sys.stderr)
         if not qresp:
             print('storequery: no content', file=sys.stderr)
             sys.exit(1)
@@ -173,6 +183,9 @@ class EDGARInsiderTrading():
         fzpath - form345 zip file from fred.stlouisfed.org
         file  - file in the zip file to read
         """
+        if self.verbose:
+            fznm = os.path.basename(fzpath)
+            print('getting largest trades from %s in %s' % (file, fznm), file=sys.stderr)
         lge = self.form345zipfileiter(fzpath, file)
         prtransdict = {}
         hdr=[]
@@ -235,6 +248,9 @@ class EDGARInsiderTrading():
         file  - name of file to search
         lt    - list of largest transactions
         """
+        if self.verbose:
+            fznm = os.path.basename(fzpath)
+            print('getting submissions from %s in %s' % (file, fznm), file=sys.stderr)
         # find transaction associated with submission
         lge = self.form345zipfileiter(fzpath, file)
         hdr = []
@@ -256,6 +272,9 @@ class EDGARInsiderTrading():
         fzpath - full path name to the form345.zip file
         file   - name of the file holding tranaction name and cik
         """
+        if self.verbose:
+            fznm = os.path.basename(fzpath)
+            print('getting submission owners from %s in %s' % (file, fznm), file=sys.stderr)
         lge = self.form345zipfileiter(fzpath, file)
         hdr = []
         for ln in lge:
@@ -300,6 +319,8 @@ class EDGARInsiderTrading():
 
         get the most recent form345.zip file from stlouisfed.org
         """
+        if self.verbose:
+            print('collecting %s' % (file), file=sys.stderr)
         url = '%s/%s' % (self.iturl, file)
         resp = self.query(url)
         ofn = os.path.join(directory, file)
@@ -342,36 +363,43 @@ class EDGARInsiderTrading():
                 print('%s: %s' % (k, adict[k]) )
 
     def processform345(self, fzpath):
+        """ processform345(fzpath)
+
+        process form345.zip file for largest transactions
+        fzpath - full path to the form345.zip file
+        """
         self.form345largesttrades(fzpath, 'NONDERIV_TRANS.tsv')
         self.form345submissions(fzpath, 'SUBMISSION.tsv')
         self.form345owners(fzpath, 'REPORTINGOWNER.tsv')
 
     def processtickers(self, insiderdb):
+        """ processtickers(insiderdb)
+
+        process ticker history for big stock movements
+        insiderdb - name of the insider database
+        """
+        if self.verbose:
+            print('checking ticker history for big movements', file=sys.stderr)
         up = self.threshold
         dwn = 1/up
-        self.sdb.insiderdbconnect(insiderdb)
+        self.sdb.dbconnect(insiderdb)
+        self.sdb.newinsidertable()
         tset = set()
         for ak in self.bigtransdict.keys():
             ticker = self.bigtransdict[ak]['ISSUERTRADINGSYMBOL'].lower()
-            if not ticker:
+            if not ticker or ticker == 'none':
                 continue
             action = self.bigtransdict[ak]['TRANS_ACQUIRED_DISP_CD']
             if ticker not in tset:
-                self.sdb.newtickertable(ticker)
-                self.sdb.newinsidertable()
-                rstr = self.sdb.getstooqtickerhistory(ticker)
-                if len(rstr.split('\n') ) ==1:
-                    print('stooq %s %s' % (ticker, rstr), file=sys.stderr)
-                    rstr = self.sdb.getmarketwatchtickerhistory(ticker)
-                    if len(rstr.split('\n') ) ==1:
-                        print('marketwatch %s %s' % (ticker, rstr),
-                              file=sys.stderr)
-                        continue
-                self.sdb.tickerinsertblob(ticker, rstr)
+                lines = self.sdb.gettickerhistory(ticker)
+                if len(lines) < 10:
+                    print('ticker: %s not found' % (ticker), file=sys.stderr)
+                    continue
+                self.sdb.newtickertable(ticker, lines[0])
+                self.sdb.tickerinsertlines(ticker, lines)
                 tset.add(ticker)
             trdate = self.bigtransdict[ak]['TRANS_DATE']
-            tres = self.sdb.selectndays(insiderdb, ticker, trdate,
-                    self.interval)
+            tres = self.sdb.selectndays(ticker, trdate, self.interval)
             day0 = None
             for trd in tres:
                 tlst = list(trd)
@@ -433,12 +461,17 @@ def main():
     argp.add_argument("--file",
         help="csv file to store the output - default stdout")
 
+    argp.add_argument("--verbose", action='store_true', default=False,
+        help="reveal some of the process")
+
     args = argp.parse_args()
 
     if args.threshold:
         EIT.setthreshold(args.threshold)
     if args.interval:
         EIT.setinterval(args.threshold)
+    if args.verbose:
+        EIT.setverbose()
 
     fznm = EIT.form345name(args.yq)
     fzpath = os.path.join(args.directory, fznm)

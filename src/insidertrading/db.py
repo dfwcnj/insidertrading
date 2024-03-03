@@ -6,12 +6,18 @@ import datetime
 import argparse
 import urllib.request
 
+try:
+    from insidertrading import stockhistory
+except ImportError as e:
+    import stockhistory
+
 class InsiderDB():
 
     def __init__(self):
         self.dbcon = None
         self.dbcur = None
-        self.ttbl = "CREATE TABLE IF NOT EXISTS %s ('Date','Open','High','Low','Close','Volume')"
+        #self.ttbl = "CREATE TABLE IF NOT EXISTS %s ('Date','Open','High','Low','Close','Volume')"
+        self.ttbl = "CREATE TABLE IF NOT EXISTS %s (%s)"
         self.tidx = "CREATE UNIQUE INDEX IF NOT EXISTS dtidx ON %s ('Date')"
         self.tins = 'INSERT OR IGNORE INTO %s VALUES (%s)'
         self.tsel = "SELECT * FROM %s WHERE Date BETWEEN date('%s') AND date('%s')"
@@ -19,13 +25,10 @@ class InsiderDB():
         self.iidx = "CREATE UNIQUE INDEX IF NOT EXISTS insidx ON insiders ('Accession_Number')"
         self.ins = 'INSERT OR IGNORE INTO insiders VALUES (%s)'
 
-        self.stooqurl = 'https://stooq.com/q/d/l/?s=%s.us&i=d'
+        self.sh = stockhistory._StockHistory()
+        # self.stooqurl = 'https://stooq.com/q/d/l/?s=%s.us&i=d'
         # symbol MM/DD/YYYY MM/DD/YYYY
-        # https://www.marketwatch.com/investing/stock/pnt/downloaddatapartial?
-        # startdate=03/01/2021%2000:00:00&enddate=03/01/2024%2000:00:00&
-        # daterange=d30&frequency=p1d&csvdownload=true&downloadpartial=false&
-        # newdates=false&countrycode=pl
-        self.mktwatchurl = 'https://www.marketwatch.com/investing/stock/{tckr}/downloaddatapartial?startdate={fdate}%2000:00:00&enddate={tdate}%2000:00:00&daterange=d30&frequency=p1d&csvdownload=true&downloadpartial=false&newdates=false'
+        # self.mktwatchurl = 'https://www.marketwatch.com/investing/stock/{tckr}/downloaddatapartial?startdate={fdate}%2000:00:00&enddate={tdate}%2000:00:00&daterange=d30&frequency=p1d&csvdownload=true&downloadpartial=false&newdates=false'
 
 
     def query(self, url=None):
@@ -42,24 +45,21 @@ class InsiderDB():
             file=sys.stderr )
             sys.exit(1)
 
-    def getmarketwatchtickerhistory(self, ticker):
+    def getyahootickerhistory(self, ticker):
         """ marketwatchtickerhistory(ticker)
 
         get stock price history for ticker
         ticker - ticker symbol for stock
         """
-        now = datetime.datetime.now()
-        day = ('%d' % (now.day) ).zfill(2)
-        mon = ('%d' % (now.month) ).zfill(2)
-        yr  = now.year
-        odt = '%s/%s/%d' % (mon, day, yr-1)
-        ndt = '%s/%s/%d' % (mon, day, yr)
-        url = self.mktwatchurl.format( tckr=ticker, fdate=odt, tdate=ndt)
-        # print(url, file=sys.stderr)
-        resp = self.query(url)
-        rstr = resp.read().decode('utf-8')
-        return rstr
+        return self.sh.getyahootickerhistory(ticker)
 
+    def getmarketwatchtickerhistory(self, ticker):
+        """ getmarketwatchtickerhistory(ticker)
+
+        get stock price history for ticker
+        ticker - ticker symbol for stock
+        """
+        return self.sh.getmarketwatchtickerhistory(ticker)
 
     def getstooqtickerhistory(self, ticker):
         """ getstooqtickerhistory(ticker)
@@ -67,13 +67,34 @@ class InsiderDB():
         get stock price history for ticker
         ticker - ticker symbol for stock
         """
-        url = self.stooqurl % (ticker)
-        # print(url, file=sys.stderr)
-        resp = self.query(url)
-        rstr = resp.read().decode('utf-8')
-        return rstr
+        return self.sh.getstooqtickerhistory(ticker)
 
-    def selectndays(self, dbfile, tblname, bdate, ndays):
+    def gettickerhistory(self, ticker):
+        """ gettickerhistory(ticker)
+
+        get ticker history from yahoo, marketwatch, or stooq
+        ticker - ticker symbol for the stock
+        """
+        lines = self.getyahootickerhistory(ticker)
+        if len(lines):
+            return lines
+        lines = self.getmarketwatchtickerhistory(ticker)
+        if len(lines):
+            return lines
+        lines = self.getstooqtickerhistory(ticker)
+        if len(lines):
+            return lines
+        return []
+
+
+    def selectndays(self, tblname, bdate, ndays):
+        """ selectndays(dbfile, tblname, bdate, ndays)
+
+        return ticker data for the ndays specified
+        tblname - name of table containing the ticker data
+        bdate - beginning date in iso format
+        ndays - number of days to collect
+        """
         bd = datetime.date.fromisoformat(bdate)
         td = datetime.timedelta(days=ndays+1)
         ed = bd + td
@@ -84,30 +105,42 @@ class InsiderDB():
         rowa = res.fetchall()
         return rowa
 
-    def insiderdbconnect(self, dbfile):
+    def dbconnect(self, dbfile):
+        """ dbconnect(dbfile)
+
+        establish connection to sqlite3 database
+        dbfile - name of the database file
+        """
         self.dbcon = sqlite3.connect(dbfile)
         self.dbcur = self.dbcon.cursor()
 
     def tickerinsert(self, tblname, line):
+        """ tickerinsert(tblname, line)
+
+        insert a ticker row into the ticker table
+        tblname - name of the table 
+        line - ticker data for 1 day
+        """
         isql = self.tins % (tblname, line)
         self.dbcur.execute(isql)
 
-    def tickerinsertblob(self, tblname, blob):
-        lines = blob.split()
+    def tickerinsertlines(self, tblname, lines):
+        cols = lines[0]
         for line in lines:
             if 'Date' in line:
                 continue
             lna = line.split(',')
-            if len(lna) < 5:
+            if len(lna) < 5:     # too short to fix
                 print('ticker: %s %s %s' % (tblname, len(lna), line) )
                 continue
-            if len(lna) == 5:
+            if len(lna) == 5:         # stooq - missing volume
                 print('ticker: %s %s %s' % (tblname, len(lna), line) )
                 lna.append('-1')
-            if len(lna) > 6:  # commas in volume
+            # yahoo finance and exception having 7 columns
+            if 'Adj' not in cols and len(lna) > 6:  # marketwatch , in Volume
                 vol = ''.join(lna[5:])
                 lna = lna[0:5] + [',%s' % vol]
-            if '/' in lna[0]:
+            if '/' in lna[0]:                       # marketwatch MM/DD/YYYY
                 mdy = lna[0].split('/')
                 lna[0] = '%s-%s-%s' % (mdy[2],mdy[1],mdy[0])
             for i in range(len(lna) ):
@@ -115,10 +148,11 @@ class InsiderDB():
             self.tickerinsert(tblname, ','.join(lna))
         self.dbcon.commit()
 
-    def newtickertable(self, tblname):
+    def newtickertable(self, tblname, hdr):
         dsql = 'DROP TABLE IF EXISTS %s' % (tblname)
         self.dbcur.execute(dsql)
-        nsql = self.ttbl % (tblname)
+        cn = "'%s'" % ("','".join(hdr.split(',') ) )
+        nsql = self.ttbl % (tblname, cn)
         self.dbcur.execute(nsql)
         isql = self.tidx % (tblname)
         self.dbcur.execute(isql)
@@ -154,19 +188,16 @@ def main():
 
     SDB = InsiderDB()
 
-    rstr = SDB.getstooqtickerhistory(args.ticker)
-    if len(rstr.split('\n') ) == 1:
-        print('stooq %s: %s' % (args.ticker, rstr), file=sys.stderr)
-        rstr = SDB.getmarketwatchtickerhistory(args.ticker)
-        if len(rstr.split('\n') ) == 1:
-            print('marketwatch %s: %s' % (args.ticker, rstr), file=sys.stderr)
-            sys.exit()
-    SDB.insiderdbconnect(args.dbfile)
-    SDB.newtickertable(args.ticker)
-    SDB.tickerinsertblob(args.ticker, rstr)
+    lines = SDB.gettickerhistory(args.ticker)
+    if not lines:
+        print('unable to get stock symbol history', file=sys.stderr)
+        sys.exit()
+    SDB.dbconnect(args.dbfile)
+    SDB.newtickertable(args.ticker, lines[0])
+    SDB.tickerinsertlines(args.ticker, lines)
     now = datetime.datetime.now()
-    boy = datetime.date(now.year, 1, 1).isoformat()
-    tres = SDB.selectndays(args.dbfile, args.ticker, boy, 7)
+    boy = datetime.date(now.year-1, 12, 12).isoformat()
+    tres = SDB.selectndays(args.ticker, boy, 7)
     print(type(tres) )
     for trec in tres:
         print(type(trec) )

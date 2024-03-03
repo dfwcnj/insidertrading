@@ -25,6 +25,7 @@ o  # insider trading
   ## stock price history data
   https://www.marketwatch.com/investing/stock/%s/downloaddatapartial
   https://stooq.com/q/d/l/?s=%s.us&i=d
+  https://query1.finance.yahoo.com/v7/finance/download/AMZN?period1=863703000&period2=1709417603&interval=1d&events=history&includeAdjustedClose=true
   ## other stock news
   https://www.moneyworks4me.com/company/news/stock-news-rss-feeds
   
