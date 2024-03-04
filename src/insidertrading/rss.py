@@ -54,8 +54,18 @@ class _RSS():
                else:
                    ih[tag] = child.text
             else:
-                ih[tag] = child.text
+                if tag in ih.keys():
+                    ih[tag] = '%s,%s' % (ih[tag], child.text)
+                else:
+                    ih[tag] = child.text
         return ih
+
+    def reportrss(self, rdict):
+        for i in range(len(rdict['items']) ):
+            item = rdict['items'][i]
+            for k in item.keys():
+                if item[k]:
+                    print('item %d %s: %s' % (i, k, item[k]) )
 
     def feed(self, rstr):
         """ feed(root)
@@ -75,7 +85,7 @@ class _RSS():
         return self.rdict
 
 
-class _GNAtom():
+class _Atom():
 
     def __init__(self):
         self.adict = {}
@@ -171,18 +181,12 @@ class _GNAtom():
 def main():
 
     argp = argparse.ArgumentParser(description='parse rss or atom file')
-    argp.add_argument('--atom', help='url of an atom file to parse')
+    argp.add_argument('--atom',
+        default='https://news.google.com/atom?hl=en-US&gl=US&ceid=US:en',
+        help='url of an atom file to parse')
     argp.add_argument('--rss', help='url of an rss file to parse')
 
     args = argp.parse_args()
-
-    if args.atom:
-        req = urllib.request.Request(args.atom)
-        resp = urllib.request.urlopen(req)
-        rstr = resp.read().decode('utf-8')
-        gna = _GNAtom()
-        fdict = gna.feed(rstr)
-        gna.reportatom()
 
     if args.rss:
         req = urllib.request.Request(args.rss)
@@ -190,11 +194,17 @@ def main():
         rstr = resp.read().decode('utf-8')
         mpr = _RSS()
         rdict = mpr.feed(rstr)
-        for i in range(len(rdict['items']) ):
-            item = rdict['items'][i]
-            for k in item.keys():
-                if item[k]:
-                    print('item %d %s: %s' % (i, k, item[k]) )
+        mpr.reportrss(rdict)
+        return
+
+    if args.atom:
+        req = urllib.request.Request(args.atom)
+        resp = urllib.request.urlopen(req)
+        rstr = resp.read().decode('utf-8')
+        gna = _Atom()
+        fdict = gna.feed(rstr)
+        gna.reportatom()
+        return
 
 if __name__ == '__main__':
     main()
