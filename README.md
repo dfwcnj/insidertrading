@@ -22,13 +22,13 @@ pip install insidertrading
 This package chooses the largest dollar transactions in the SEC form345
 file and reports transactions where the stock price rose, in case of an
 acquisition, or fell, in case of a disposal, over a certain percentage
-dugine the following week.
+during the following week.
 
 THIS DOES NOT CLAIM THAT ANY OF THESE TRANSACTIONS ARE ILLEGAL.
 
 It merely reports that the stock moved by some threshold after the
-transaction. It could be because of coincidence, because the stock is
-unusually volatile, or some other innocuous reason.
+transaction. It could be because of personal reasons, coincidence,
+because the stock is unusually volatile, or some other innocuous reason.
 
 If you do not provide a --yq argument, the command determins the last
 quarter from the current date and uses that
