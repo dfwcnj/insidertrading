@@ -30,11 +30,11 @@ It merely reports that the stock moved by some threshold after the
 transaction. It could be because of personal reasons, coincidence,
 because the stock is unusually volatile, or some other innocuous reason.
 
-If you do not provide a --yq argument, the command determins the last
+If you do not provide a --yq argument, the command determines the last
 quarter from the current date and uses that
 
 if you do not provide an --insiderdb argument, the sqlite3 database is
-created in the current directory
+created in RAM.
 
 ## Usage
 
