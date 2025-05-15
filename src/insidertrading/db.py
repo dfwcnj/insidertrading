@@ -6,11 +6,6 @@ import datetime
 import argparse
 import urllib.request
 
-try:
-    from insidertrading import stockhistory
-except ImportError as e:
-    import stockhistory
-
 class InsiderDB():
 
     def __init__(self):
