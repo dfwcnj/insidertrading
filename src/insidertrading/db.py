@@ -16,20 +16,17 @@ class InsiderDB():
     def __init__(self):
         self.dbcon = None
         self.dbcur = None
-        #self.ttbl = "CREATE TABLE IF NOT EXISTS %s ('Date','Open','High','Low','Close','Volume')"
         self.ttbl = "CREATE TABLE IF NOT EXISTS %s (%s)"
         self.tidx = "CREATE UNIQUE INDEX IF NOT EXISTS dtidx ON %s ('Date')"
         self.tins = 'INSERT OR IGNORE INTO %s VALUES (%s)'
         self.tsel = "SELECT * FROM %s WHERE Date BETWEEN date('%s') AND date('%s')"
-        # self.itbl = "CREATE TABLE IF NOT EXISTS insiders ('Accession_Number','CIK','Name','Dollars','Ticker','BDate','BOpen','BHigh','BLow','BClose','BVolume','Date','Open','High','Low','Close','Volume')"
-        self.itbl = "CREATE TABLE IF NOT EXISTS insiders ('Accession_Number','CIK','Name','Ticker','Dollars','BDate','BOpen','BHigh','BLow','BClose','BVolume','Date','Open','High','Low','Close','Volume')"
-        self.iidx = "CREATE UNIQUE INDEX IF NOT EXISTS insidx ON insiders ('Accession_Number')"
-        self.ins = 'INSERT OR IGNORE INTO insiders VALUES (%s)'
 
-        self.sh = stockhistory._StockHistory()
-        # self.stooqurl = 'https://stooq.com/q/d/l/?s=%s.us&i=d'
-        # symbol MM/DD/YYYY MM/DD/YYYY
-        # self.mktwatchurl = 'https://www.marketwatch.com/investing/stock/{tckr}/downloaddatapartial?startdate={fdate}%2000:00:00&enddate={tdate}%2000:00:00&daterange=d30&frequency=p1d&csvdownload=true&downloadpartial=false&newdates=false'
+        # from transaction, submission owner  with dollars computed without footnotes
+        #
+        self.itbl = "CREATE TABLE IF NOT EXISTS insiders ('ACCESSION_NUMBER', 'NONDERIV_TRANS_SK', 'SECURITY_TITLE', 'TRANS_DATE', 'DEEMED_EXECUTION_DATE', 'TRANS_FORM_TYPE', 'TRANS_CODE', 'EQUITY_SWAP_INVOLVED', 'TRANS_TIMELINESS', 'TRANS_SHARES', 'TRANS_PRICEPERSHARE', 'TRANS_ACQUIRED_DISP_CD', 'SHRS_OWND_FOLWNG_TRANS', 'VALU_OWND_FOLWNG_TRANS', 'DIRECT_INDIRECT_OWNERSHIP', 'NATURE_OF_OWNERSHIP', 'TRANSDOLLARS', 'FILING_DATE', 'NO_SECURITIES_OWNED', 'DOCUMENT_TYPE', 'ISSUERCIK', 'ISSUERNAME', 'ISSUERTRADINGSYMBOL', 'RPTOWNERCIK', 'RPTOWNERNAME', 'RPTOWNER_RELATIONSHIP', 'RPTOWNER_TITLE', 'RPTOWNER_TXT', 'FILE_NUMBER')"
+
+        self.iidx = "CREATE UNIQUE INDEX IF NOT EXISTS insidx ON insiders ('ACCESSION_NUMBER')"
+        self.ins = 'INSERT OR IGNORE INTO insiders VALUES (%s)'
 
 
     def query(self, url=None):
@@ -45,48 +42,6 @@ class InsiderDB():
             print("Error %s(%s): %s" % ('query', url, e.reason),
             file=sys.stderr )
             sys.exit(1)
-
-    def getyahootickerhistory(self, ticker):
-        """ marketwatchtickerhistory(ticker)
-
-        get stock price history for ticker
-        ticker - ticker symbol for stock
-        """
-        return self.sh.getyahootickerhistory(ticker)
-
-    def getmarketwatchtickerhistory(self, ticker):
-        """ getmarketwatchtickerhistory(ticker)
-
-        get stock price history for ticker
-        ticker - ticker symbol for stock
-        """
-        return self.sh.getmarketwatchtickerhistory(ticker)
-
-    def getstooqtickerhistory(self, ticker):
-        """ getstooqtickerhistory(ticker)
-
-        get stock price history for ticker
-        ticker - ticker symbol for stock
-        """
-        return self.sh.getstooqtickerhistory(ticker)
-
-    def gettickerhistory(self, ticker):
-        """ gettickerhistory(ticker)
-
-        get ticker history from yahoo, marketwatch, or stooq
-        ticker - ticker symbol for the stock
-        """
-        lines = self.getyahootickerhistory(ticker)
-        if len(lines):
-            return lines
-        lines = self.getmarketwatchtickerhistory(ticker)
-        if len(lines):
-            return lines
-        lines = self.getstooqtickerhistory(ticker)
-        if len(lines):
-            return lines
-        return []
-
 
     def selectndays(self, tblname, bdate, ndays):
         """ selectndays(dbfile, tblname, bdate, ndays)
@@ -106,6 +61,23 @@ class InsiderDB():
         rowa = res.fetchall()
         return rowa
 
+    def selectdays(self, tblname, sdate, edate):
+        """ selectndays(dbfile, tblname, sdate, edate)
+
+        return ticker data for the days specified
+        tblname - name of table containing the ticker data
+        sdate - beginning date in iso format
+        edate - end date in iso format
+        """
+        sd = datetime.date.fromisoformat(sdate)
+        ed = datetime.date.fromisoformat(edate)
+        bds = sd.strftime('%Y-%m-%d')
+        eds = ed.strftime('%Y-%m-%d')
+        dsql = self.tsel % (tblname, bds, eds)
+        res = self.dbcur.execute(dsql)
+        rowa = res.fetchall()
+        return rowa
+
     def dbconnect(self, dbfile):
         """ dbconnect(dbfile)
 
@@ -115,53 +87,14 @@ class InsiderDB():
         self.dbcon = sqlite3.connect(dbfile)
         self.dbcur = self.dbcon.cursor()
 
-    def tickerinsert(self, tblname, line):
-        """ tickerinsert(tblname, line)
-
-        insert a ticker row into the ticker table
-        tblname - name of the table 
-        line - ticker data for 1 day
-        """
-        isql = self.tins % (tblname, line)
-        self.dbcur.execute(isql)
-
-    def tickerinsertlines(self, tblname, lines):
-        cols = lines[0]
-        for line in lines:
-            if 'Date' in line:
-                continue
-            lna = line.split(',')
-            if len(lna) < 5:     # too short to fix
-                print('ticker: %s %s %s' % (tblname, len(lna), line) )
-                continue
-            if len(lna) == 5:         # stooq - missing volume
-                print('ticker: %s %s %s' % (tblname, len(lna), line) )
-                lna.append('-1')
-            # yahoo finance and exception having 7 columns
-            if 'Adj' not in cols and len(lna) > 6:  # marketwatch , in Volume
-                vol = ''.join(lna[5:])
-                lna = lna[0:5] + [',%s' % vol]
-            if '/' in lna[0]:                       # marketwatch MM/DD/YYYY
-                mdy = lna[0].split('/')
-                lna[0] = '%s-%s-%s' % (mdy[2],mdy[1],mdy[0])
-            for i in range(len(lna) ):
-                lna[i] = "'%s'" % (lna[i])
-            self.tickerinsert(tblname, ','.join(lna))
-        self.dbcon.commit()
-
-    def newtickertable(self, tblname, hdr):
-        dsql = 'DROP TABLE IF EXISTS %s' % (tblname)
-        self.dbcur.execute(dsql)
-        cn = "'%s'" % ("','".join(hdr.split(',') ) )
-        nsql = self.ttbl % (tblname, cn)
-        self.dbcur.execute(nsql)
-        isql = self.tidx % (tblname)
-        self.dbcur.execute(isql)
-        self.dbcon.commit()
-
     def insiderinsert(self, rec):
         isql = self.ins % (rec)
         self.dbcur.execute(isql)
+        self.dbcon.commit()
+
+    def newtinsidertable(self):
+        self.dbcur.execute(self.titbl)
+        self.dbcur.execute(self.iidx)
         self.dbcon.commit()
 
     def newinsidertable(self):
